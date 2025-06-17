@@ -3,56 +3,98 @@
     <div v-if="reminders.length" class="reminder-widgets">
       <div v-for="(reminder, idx) in reminders" :key="idx" class="reminder-widget">
         <span class="reminder-name">{{ reminder.name }}</span>
-        <span class="reminder-days">{{ daysSince(reminder.date) }} day<span v-if="daysSince(reminder.date) !== 1">s</span></span>
+        <span class="reminder-days">{{ daysSince(reminder.date, reminder.time) }} day<span v-if="daysSince(reminder.date, reminder.time) !== 1">s</span></span>
+        <span v-if="reminder.time" class="reminder-time">({{ timeSince(reminder.date, reminder.time) }})</span>
       </div>
     </div>
     <h2>Reminders</h2>
-    <form @submit.prevent="addDate">
-      <div class="form-group">
-        <label for="nameInput">Occasion:</label>
-        <input type="text" id="nameInput" v-model="inputName" placeholder="e.g. Anniversary" required />
-      </div>
-      <div class="form-group">
-        <label for="dateInput">Select a date:</label>
-        <input type="date" id="dateInput" v-model="inputDate" required />
-      </div>
-      <button type="submit">Add Reminder</button>
-    </form>
     <div v-if="reminders.length" class="result">
       <div v-for="(reminder, idx) in reminders" :key="'list-' + idx" class="reminder-item">
         <p>
           <span class="reminder-name">{{ reminder.name }}</span>:
-          <strong>{{ daysSince(reminder.date) }}</strong> day<span v-if="daysSince(reminder.date) !== 1">s</span> since {{ reminder.date }}
+          <strong>{{ daysSince(reminder.date, reminder.time) }}</strong> day<span v-if="daysSince(reminder.date, reminder.time) !== 1">s</span> since {{ reminder.date }}<span v-if="reminder.time"> {{ reminder.time }}</span>
+          <span v-if="reminder.time" class="reminder-time">({{ timeSince(reminder.date, reminder.time) }})</span>
         </p>
       </div>
     </div>
     <div v-else class="result">
-      <p>No reminders yet. Add your special dates above!</p>
+      <p>No reminders yet. Add your special dates in reminders.json!</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 
-const inputName = ref('')
-const inputDate = ref('')
 const reminders = ref([])
+const now = ref(Date.now())
+let intervalId = null
 
-function addDate() {
-  if (!inputName.value.trim() || !inputDate.value) return
-  reminders.value.push({ name: inputName.value.trim(), date: inputDate.value })
-  inputName.value = ''
-  inputDate.value = ''
+// Load reminders from localStorage or reminders.json
+async function loadReminders() {
+  // Always try to load reminders.json on first load
+  try {
+    const res = await fetch('reminders.json?_=' + Date.now()) // cache-busting
+    if (res.ok) {
+      reminders.value = await res.json()
+      return
+    }
+  } catch (e) {
+    reminders.value = []
+  }
+  // Fallback to localStorage if fetch fails
+  if (localStorage.getItem('reminders')) {
+    try {
+      reminders.value = JSON.parse(localStorage.getItem('reminders'))
+    } catch (e) {
+      reminders.value = []
+    }
+  }
 }
 
-function daysSince(dateStr) {
-  const selected = new Date(dateStr)
+loadReminders()
+
+// Persist reminders to localStorage whenever they change
+watch(reminders, (val) => {
+  localStorage.setItem('reminders', JSON.stringify(val))
+}, { deep: true })
+
+onMounted(() => {
+  intervalId = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (intervalId) clearInterval(intervalId)
+})
+
+function daysSince(dateStr, timeStr) {
+  // If no time, use midnight
+  const selected = new Date(dateStr + (timeStr ? 'T' + timeStr : 'T00:00'))
   const today = new Date()
-  selected.setHours(0,0,0,0)
-  today.setHours(0,0,0,0)
+  // Only zero out time if no timeStr is provided
+  if (!timeStr) {
+    selected.setHours(0,0,0,0)
+    today.setHours(0,0,0,0)
+  }
   const diff = today - selected
   return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
+function timeSince(dateStr, timeStr) {
+  if (!timeStr) return ''
+  const selected = new Date(dateStr + 'T' + timeStr)
+  let diff = now.value - selected.getTime()
+  if (diff < 0) return 'in the future'
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  diff -= days * (1000 * 60 * 60 * 24)
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  diff -= hours * (1000 * 60 * 60)
+  const minutes = Math.floor(diff / (1000 * 60))
+  diff -= minutes * (1000 * 60)
+  const seconds = Math.floor(diff / 1000)
+  return `${days}d ${hours}h ${minutes}m ${seconds}s ago`
 }
 </script>
 
@@ -102,74 +144,6 @@ h2 {
   margin-bottom: 1.2rem;
   letter-spacing: 1px;
 }
-.form-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
-label {
-  margin-bottom: 0.3rem;
-  color: #7c5e99;
-  font-size: 1.1rem;
-  font-family: 'Segoe UI', cursive, sans-serif;
-}
-input[type="date"]::-webkit-input-placeholder,
-input[type="date"]::placeholder {
-  color: #b799ff;
-  font-style: italic;
-  opacity: 1;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: hue-rotate(270deg) brightness(1.2) saturate(1.5);
-}
-input[type="date"] {
-  border: 1px solid #c3aed6;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  background: #f3e8ff;
-  color: #2d1836;
-  font-family: 'Segoe UI', cursive, sans-serif;
-  margin-bottom: 1rem;
-  position: relative;
-}
-input[type="date"]:before {
-  content: attr(data-placeholder);
-  color: #b799ff;
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  font-style: italic;
-  font-size: 1rem;
-}
-input[type="text"] {
-  border: 1px solid #c3aed6;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  background: #f3e8ff;
-  color: #2d1836;
-  font-family: 'Segoe UI', cursive, sans-serif;
-  margin-bottom: 1rem;
-}
-button {
-  background: #b799ff;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.6rem 1.2rem;
-  font-size: 1.1rem;
-  font-family: 'Dancing Script', 'Segoe UI', cursive, sans-serif;
-  margin-top: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-button:hover {
-  background: #a084ca;
-}
 .result {
   margin-top: 2rem;
   font-size: 1.3rem;
@@ -216,5 +190,12 @@ button:hover {
 .reminder-widget .reminder-days {
   color: #7c5e99;
   font-size: 1.05rem;
+}
+.reminder-time {
+  display: block;
+  color: #8a5fc2; /* 10% darker than #b799ff */
+  font-size: 0.95rem;
+  font-family: 'Segoe UI', cursive, sans-serif;
+  margin-top: 0.1rem;
 }
 </style>
