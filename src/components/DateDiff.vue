@@ -7,17 +7,8 @@
         <span v-if="reminder.time" class="reminder-time">({{ timeSince(reminder.date, reminder.time) }})</span>
       </div>
     </div>
-    <h2>Reminders</h2>
-    <div v-if="reminders.length" class="result">
-      <div v-for="(reminder, idx) in reminders" :key="'list-' + idx" class="reminder-item">
-        <p>
-          <span class="reminder-name">{{ reminder.name }}</span>:
-          <strong>{{ daysSince(reminder.date, reminder.time) }}</strong> day<span v-if="daysSince(reminder.date, reminder.time) !== 1">s</span> since {{ reminder.date }}<span v-if="reminder.time"> {{ reminder.time }}</span>
-          <span v-if="reminder.time" class="reminder-time">({{ timeSince(reminder.date, reminder.time) }})</span>
-        </p>
-      </div>
-    </div>
-    <div v-else class="result">
+    <h2>Memories <span aria-label="heart" role="img">❤️</span></h2>
+    <div v-if="!reminders.length" class="result">
       <p>No reminders yet. Add your special dates in reminders.json!</p>
     </div>
   </div>
