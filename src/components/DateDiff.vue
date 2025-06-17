@@ -90,6 +90,8 @@ function timeSince(dateStr, timeStr) {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Segoe+UI:wght@400;700&display=swap');
+
 .date-diff-container {
   max-width: 400px;
   margin: 2rem auto;
